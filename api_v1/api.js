@@ -217,7 +217,7 @@ export const InsetLimit = async (req, res) => {
         }).sort({ _id: -1 });
       
         if (data.length > 0) {
-          const activityStatus = timeDiffInMinutes > 333 ? "inactive" : "active";
+          const activityStatus = timeDiffInMinutes > 5 ? "inactive" : "active";
             const sensor1Data = data.map(item => item.Sensor1);
             const sensor2Data = data.map(item => item.Sensor2);
             const sensor3Data = data.map(item => item.Sensor3);
@@ -256,8 +256,6 @@ export const InsetLimit = async (req, res) => {
             return result;
           }, {});
       
-      
-
           const response = {
             Sensor1: sensor1Data,
             Sensor2: sensor2Data,
@@ -272,7 +270,6 @@ export const InsetLimit = async (req, res) => {
       
           res.status(200).json(response);
         } else {
-
           res.status(201).json({
             error: "No Data Found",
             value: activet_data,
@@ -280,6 +277,7 @@ export const InsetLimit = async (req, res) => {
           });
         }
       }
+    
       // last 3 hr data
       else if (data_stage === "3hr") {
 
@@ -321,7 +319,7 @@ export const InsetLimit = async (req, res) => {
         // console.log("data=",data)
         if (data.length > 0) {
 
-          const activityStatus = timeDiffInMinutes > 333 ? "inactive" : "active";
+          const activityStatus = timeDiffInMinutes > 5 ? "inactive" : "active";
   
           const sensor1Data = data.map(item => item.Sensor1);
           const sensor2Data = data.map(item => item.Sensor2);
@@ -418,7 +416,8 @@ export const InsetLimit = async (req, res) => {
           },
         }).sort({ _id: -1 });
         if (data.length > 0) {
-            const activityStatus = timeDiffInMinutes > 333 ? "inactive" : "active";
+            const activityStatus = timeDiffInMinutes > 5 ? "inactive" : "active";
+
             const sensor1Data = data.map(item => item.Sensor1);
             const sensor2Data = data.map(item => item.Sensor2);
             const sensor3Data = data.map(item => item.Sensor3);
@@ -515,7 +514,7 @@ export const InsetLimit = async (req, res) => {
           },
         }).sort({ _id: -1 });
         if (data.length > 0) {
-            const activityStatus = timeDiffInMinutes > 333 ? "inactive" : "active";
+            const activityStatus = timeDiffInMinutes > 5 ? "inactive" : "active";
             const sensor1Data = data.map(item => item.Sensor1);
             const sensor2Data = data.map(item => item.Sensor2);
             const sensor3Data = data.map(item => item.Sensor3);
