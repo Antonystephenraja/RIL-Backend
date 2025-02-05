@@ -103,7 +103,7 @@ export const validateToken = (req, res) => {
         const newData = new InsertModel({ Id, Sensor1, Sensor2, Sensor3, Sensor4, Time });
 
         await newData.save();
-        return res.status(201).json({ message: "Data inserted successfully", data: newData });
+        return res.status(200).json({ message: "Data inserted successfully", data: newData });
     } catch (error) {
         return res.status(401).json({ message: "Token verification failed", error: error.message });
     }
@@ -147,6 +147,8 @@ export const InsetLimit = async (req, res) => {
   }
 };
 
+let previousCount = 0;
+
 
   export const GetData = async (req, res) => {
     try {
@@ -175,12 +177,15 @@ export const InsetLimit = async (req, res) => {
       )}-${day.padStart(2, "0")}T${hours}:${minutes}:${seconds}Z`;
   
       const limitData = await InsertLimit.findOne({}, 'MinLimit MaxLimit');
+      const count = await InsertModel.countDocuments({});
+
 
       const activet_data = await InsertModel.findOne({}).sort({ _id: -1 });
       const lastDataTime = activet_data.Time;
       const timeDiffInMinutes =
         (new Date(formattedCurrentTime) - new Date(lastDataTime)) /
         (1000 * 60);
+
 
       // last 1 hr data
       if (data_stage === "1hr") {
@@ -266,21 +271,27 @@ export const InsetLimit = async (req, res) => {
             activityStatus,
             LimitData: limitData,
             value: activet_data,
+            terminal_status:count > previousCount,
           };
       
           res.status(200).json(response);
+          previousCount = count;
+
         } else {
           res.status(201).json({
             error: "No Data Found",
             value: activet_data,
             LimitData: limitData,
+            terminal_status:count > previousCount,
+  
           });
+          previousCount = count;
+
         }
       }
     
       // last 3 hr data
       else if (data_stage === "3hr") {
-
         const currentTimeMinusTwelveHr = new Date(
           currentDateTime.getTime() - 3 * 60 * 60 * 1000
         );
@@ -360,6 +371,7 @@ export const InsetLimit = async (req, res) => {
           return result;
         }, {});
     
+
     
         const response = {
           Sensor1: sensor1Data,
@@ -371,15 +383,22 @@ export const InsetLimit = async (req, res) => {
           activityStatus,
           LimitData: limitData,
           value: activet_data,
+          terminal_status:count > previousCount,
         };
     
         res.status(200).json(response);
+        previousCount = count;
+
       } else {
         res.status(201).json({
           error: "No Data Found",
           value: activet_data,
           LimitData: limitData,
+          terminal_status:count > previousCount,
+
         });
+        previousCount = count;
+
       }
       }
       // last 5 hr data
@@ -466,15 +485,22 @@ export const InsetLimit = async (req, res) => {
             activityStatus,
             LimitData: limitData,
             value: activet_data,
+            terminal_status:count > previousCount,
           };
       
           res.status(200).json(response);
+          previousCount = count;
+
         } else {
           res.status(201).json({
             error: "No Data Found",
             value: activet_data,
             LimitData: limitData,
+            terminal_status:count > previousCount,
+  
           });
+          previousCount = count;
+
         }
       }
       // last 12 hr data
@@ -535,7 +561,6 @@ export const InsetLimit = async (req, res) => {
             
               const maxValue = Math.max(...validData);
               const minValue = Math.min(...validData);
-            
               const maxIndex = sensorData.indexOf(maxValue.toString());
               const minIndex = sensorData.indexOf(minValue.toString());
               return {
@@ -553,7 +578,6 @@ export const InsetLimit = async (req, res) => {
             return result;
           }, {});
       
-      
           const response = {
             Sensor1: sensor1Data,
             Sensor2: sensor2Data,
@@ -564,15 +588,22 @@ export const InsetLimit = async (req, res) => {
             activityStatus,
             LimitData: limitData,
             value: activet_data,
+            terminal_status:count > previousCount,
           };
       
           res.status(200).json(response);
+          previousCount = count;
+
         } else {
           res.status(201).json({
             error: "No Data Found",
             value: activet_data,
             LimitData: limitData,
+            terminal_status:count > previousCount,
+  
           });
+          previousCount = count;
+
         }
       }
   
@@ -666,15 +697,22 @@ export const InsetLimit = async (req, res) => {
             activityStatus,
             LimitData: limitData,
             value: activet_data,
+            terminal_status:count > previousCount,
           };
       
           res.status(200).json(response);
+          previousCount = count;
+
         } else {
           res.status(201).json({
             error: "No Data Found",
             value: activet_data,
             LimitData: limitData,
+            terminal_status:count > previousCount,
+  
           });
+          previousCount = count;
+
         }
       }
   
@@ -764,15 +802,22 @@ export const InsetLimit = async (req, res) => {
             activityStatus,
             LimitData: limitData,
             value: activet_data,
+            terminal_status:count > previousCount,
           };
       
           res.status(200).json(response);
+          previousCount = count;
+
         } else {
           res.status(201).json({
             error: "No Data Found",
             value: activet_data,
             LimitData: limitData,
+            terminal_status:count > previousCount,
+  
           });
+          previousCount = count;
+
         }
       }
   
@@ -863,15 +908,22 @@ export const InsetLimit = async (req, res) => {
             activityStatus,
             LimitData: limitData,
             value: activet_data,
+            terminal_status:count > previousCount,
           };
       
           res.status(200).json(response);
+          previousCount = count;
+
         } else {
           res.status(201).json({
             error: "No Data Found",
             value: activet_data,
             LimitData: limitData,
+            terminal_status:count > previousCount,
+  
           });
+          previousCount = count;
+
         }
       }
     } catch (error) {
