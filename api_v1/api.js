@@ -195,7 +195,7 @@ export const GetData = async (req, res) => {
       "0"
     )}-${day.padStart(2, "0")},${hours}:${minutes}:${seconds}`;
 
-    console.log("current time", formattedCurrentTime);
+    // console.log("current time", formattedCurrentTime);
 
     const limitData = await InsertLimit.findOne({}, "MinLimit MaxLimit");
     const count = await InsertModel.countDocuments({});
@@ -546,7 +546,7 @@ export const GetData = async (req, res) => {
       const formattedCurrentTimeMinusTwelveHr = `${year2}-${month2.padStart(
         2,
         "0"
-      )}-${day2.padStart(2, "0")}T${hours2}:${minutes2}:${seconds2}Z`;
+      )}-${day2.padStart(2, "0")},${hours2}:${minutes2}:${seconds2}`;
 
       // console.log("time before 12hr:", formattedCurrentTimeMinusTwelveHr);
 
@@ -652,7 +652,7 @@ export const GetData = async (req, res) => {
       const formattedCurrentTimeMinusTwentyFourHr = `${year2}-${month2.padStart(
         2,
         "0"
-      )}-${day2.padStart(2, "0")}T${hours2}:${minutes2}:${seconds2}Z`;
+      )}-${day2.padStart(2, "0")},${hours2}:${minutes2}:${seconds2}`;
 
       // console.log("time before 24hr:", formattedCurrentTimeMinusTwentyFourHr);
 
@@ -756,7 +756,7 @@ export const GetData = async (req, res) => {
       const formattedCurrentTimeMinusSevenDays = `${year2}-${month2.padStart(
         2,
         "0"
-      )}-${day2.padStart(2, "0")}T${hours2}:${minutes2}:${seconds2}Z`;
+      )}-${day2.padStart(2, "0")},${hours2}:${minutes2}:${seconds2}`;
 
       // console.log("time before 7d:", formattedCurrentTimeMinusSevenDays);
       const data = await InsertModel.find({
@@ -859,7 +859,7 @@ export const GetData = async (req, res) => {
       const formattedCurrentTimeMinusThirtyDays = `${year2}-${month2.padStart(
         2,
         "0"
-      )}-${day2.padStart(2, "0")}T${hours2}:${minutes2}:${seconds2}Z`;
+      )}-${day2.padStart(2, "0")},${hours2}:${minutes2}:${seconds2}`;
 
       // console.log("time before 30d:", formattedCurrentTimeMinusThirtyDays);
 
