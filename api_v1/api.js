@@ -246,7 +246,7 @@ export const GetData = async (req, res) => {
       }).sort({ _id: -1 });
 
       if (data.length > 0) {
-        const activityStatus = timeDiffInMinutes > 5 ? "inactive" : "active";
+        const activityStatus = timeDiffInMinutes > 20 ? "inactive" : "active";
         const sensor1Data = data.map((item) => item.Sensor1);
         const sensor2Data = data.map((item) => item.Sensor2);
         const sensor3Data = data.map((item) => item.Sensor3);
@@ -354,7 +354,7 @@ export const GetData = async (req, res) => {
       // console.log("current time=",formattedCurrentTime,"before 3 hrs=",formattedCurrentTimeMinusTwelveHr)
       // console.log("data=",data)
       if (data.length > 0) {
-        const activityStatus = timeDiffInMinutes > 5 ? "inactive" : "active";
+        const activityStatus = timeDiffInMinutes > 20 ? "inactive" : "active";
 
         const sensor1Data = data.map((item) => item.Sensor1);
         const sensor2Data = data.map((item) => item.Sensor2);
@@ -454,7 +454,7 @@ export const GetData = async (req, res) => {
         },
       }).sort({ _id: -1 });
       if (data.length > 0) {
-        const activityStatus = timeDiffInMinutes > 5 ? "inactive" : "active";
+        const activityStatus = timeDiffInMinutes > 20 ? "inactive" : "active";
 
         const sensor1Data = data.map((item) => item.Sensor1);
         const sensor2Data = data.map((item) => item.Sensor2);
@@ -556,7 +556,7 @@ export const GetData = async (req, res) => {
         },
       }).sort({ _id: -1 });
       if (data.length > 0) {
-        const activityStatus = timeDiffInMinutes > 5 ? "inactive" : "active";
+        const activityStatus = timeDiffInMinutes > 20 ? "inactive" : "active";
         const sensor1Data = data.map((item) => item.Sensor1);
         const sensor2Data = data.map((item) => item.Sensor2);
         const sensor3Data = data.map((item) => item.Sensor3);
@@ -662,7 +662,7 @@ export const GetData = async (req, res) => {
         },
       }).sort({ _id: -1 });
       if (data.length > 0) {
-        const activityStatus = timeDiffInMinutes > 333 ? "inactive" : "active";
+        const activityStatus = timeDiffInMinutes > 20 ? "inactive" : "active";
         const sensor1Data = data.map((item) => item.Sensor1);
         const sensor2Data = data.map((item) => item.Sensor2);
         const sensor3Data = data.map((item) => item.Sensor3);
@@ -765,7 +765,7 @@ export const GetData = async (req, res) => {
         },
       }).sort({ _id: -1 });
       if (data.length > 0) {
-        const activityStatus = timeDiffInMinutes > 333 ? "inactive" : "active";
+        const activityStatus = timeDiffInMinutes > 20 ? "inactive" : "active";
         const sensor1Data = data.map((item) => item.Sensor1);
         const sensor2Data = data.map((item) => item.Sensor2);
         const sensor3Data = data.map((item) => item.Sensor3);
@@ -869,7 +869,7 @@ export const GetData = async (req, res) => {
         },
       }).sort({ _id: -1 });
       if (data.length > 0) {
-        const activityStatus = timeDiffInMinutes > 333 ? "inactive" : "active";
+        const activityStatus = timeDiffInMinutes > 20 ? "inactive" : "active";
         const sensor1Data = data.map((item) => item.Sensor1);
         const sensor2Data = data.map((item) => item.Sensor2);
         const sensor3Data = data.map((item) => item.Sensor3);
@@ -938,5 +938,91 @@ export const GetData = async (req, res) => {
   } catch (error) {
     console.error("Error with fetching data:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// reports api
+export const getRilReport = async (req, res) => {
+  try {
+    // console.log('reports api triggered');
+    const {
+      // projectName,
+      fromDate,
+      toDate,
+      count,
+    } = req.query;
+
+    if (fromDate && toDate) {
+      const formattedFromDate = fromDate + ",00:00:00";
+      const formattedToDate = toDate + ",23:59:59";
+
+      const data = await InsertModel.find({
+        Time: {
+          $gte: formattedFromDate,
+          $lte: formattedToDate,
+        },
+      })
+        .sort({ _id: -1 })
+        .select({
+          _id: 0,
+          __v: 0,
+        });
+
+      if (data.length > 0) {
+        res.status(200).json(data);
+      } else if (data.length === 0) {
+        res.status(200).json([]);
+      }
+    } else if (count) {
+      const data = await InsertModel.find({})
+        .limit(count)
+        .sort({ _id: -1 })
+        .select({
+          _id: 0,
+          __v: 0,
+        });
+      if (data.length > 0) {
+        res.status(200).json(data);
+      } else if (data.length === 0) {
+        res.status(200).json([]);
+      }
+    }
+
+    // let query = {};
+    // let sort = { _id: -1 };
+
+    // let projection = { __v: 0, _id: 0 };
+
+    // let cursor = InsertModel.find(query).sort(sort).select(projection);
+
+    // if (count) {
+    //   cursor = cursor.limit(parseInt(count));
+    // }
+
+    // const rilReportData = await cursor.exec();
+
+    // const configSplit = thermocoupleConfiguration.split("-Pot:");
+    // const lineName = configSplit[0]?.trim();
+    // const potNumber = configSplit[1]?.trim();
+
+    // const filteredData = hindalcoReportData.filter((data) => {
+    //   if (data.Time) {
+    //     const dbDate = data.Time;
+    //     return dbDate >= formattedFromDate && dbDate < formattedToDate;
+    //   }
+    //   return false;
+    // });
+
+    // const filteredDataByConfig = filteredData.filter((data) => {
+    //   return data.LineName === lineName && data.PotNumber === potNumber;
+    // });
+
+    // res.status(200).json({ success: true, data: filteredDataByConfig });
+
+    // else {
+    //   res.status(200).json({ success: true, data: hindalcoReportData });
+    // }
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server Error" });
   }
 };
