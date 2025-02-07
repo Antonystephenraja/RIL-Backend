@@ -525,7 +525,6 @@ export const GetData = async (req, res) => {
       const currentTimeMinusTwelveHr = new Date(
         currentDateTime.getTime() - 12 * 60 * 60 * 1000
       );
-
       const kolkataTime2 = currentTimeMinusTwelveHr.toLocaleString("en-US", {
         timeZone: "Asia/Kolkata",
         hour12: false,
