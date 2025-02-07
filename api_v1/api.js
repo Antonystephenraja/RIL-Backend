@@ -522,6 +522,8 @@ export const GetData = async (req, res) => {
     }
     // last 12 hr data
     else if (data_stage === "12hr") {
+      // console.log("yes")
+      
       const currentTimeMinusTwelveHr = new Date(
         currentDateTime.getTime() - 12 * 60 * 60 * 1000
       );
