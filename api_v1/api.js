@@ -523,7 +523,7 @@ export const GetData = async (req, res) => {
     // last 12 hr data
     else if (data_stage === "12hr") {
       // console.log("yes")
-      
+
       const currentTimeMinusTwelveHr = new Date(
         currentDateTime.getTime() - 12 * 60 * 60 * 1000
       );
@@ -954,6 +954,7 @@ export const getRilReport = async (req, res) => {
       count,
     } = req.query;
 
+    // date picker
     if (fromDate && toDate) {
       const formattedFromDate = fromDate + ",00:00:00";
       const formattedToDate = toDate + ",23:59:59";
@@ -975,7 +976,9 @@ export const getRilReport = async (req, res) => {
       } else if (data.length === 0) {
         res.status(200).json([]);
       }
-    } else if (count) {
+    }
+    // countwise option
+    else if (count) {
       const data = await InsertModel.find({})
         .limit(count)
         .sort({ _id: -1 })
@@ -989,42 +992,443 @@ export const getRilReport = async (req, res) => {
         res.status(200).json([]);
       }
     }
-
-    // let query = {};
-    // let sort = { _id: -1 };
-
-    // let projection = { __v: 0, _id: 0 };
-
-    // let cursor = InsertModel.find(query).sort(sort).select(projection);
-
-    // if (count) {
-    //   cursor = cursor.limit(parseInt(count));
-    // }
-
-    // const rilReportData = await cursor.exec();
-
-    // const configSplit = thermocoupleConfiguration.split("-Pot:");
-    // const lineName = configSplit[0]?.trim();
-    // const potNumber = configSplit[1]?.trim();
-
-    // const filteredData = hindalcoReportData.filter((data) => {
-    //   if (data.Time) {
-    //     const dbDate = data.Time;
-    //     return dbDate >= formattedFromDate && dbDate < formattedToDate;
-    //   }
-    //   return false;
-    // });
-
-    // const filteredDataByConfig = filteredData.filter((data) => {
-    //   return data.LineName === lineName && data.PotNumber === potNumber;
-    // });
-
-    // res.status(200).json({ success: true, data: filteredDataByConfig });
-
-    // else {
-    //   res.status(200).json({ success: true, data: hindalcoReportData });
-    // }
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server Error" });
+    res.status(500).json({ success: false, message: error });
+  }
+};
+
+export const getRilAverageReport = async (req, res) => {
+  try {
+    const {
+      // projectName,
+      avgFromDate,
+      avgToDate,
+      averageOption,
+      intervalFromDate,
+      intervalToDate,
+      intervalOption,
+    } = req.query;
+
+    // console.log("req query", req.query);
+
+    // const ID = "XY001";
+
+    // average option
+    if (avgFromDate && avgToDate) {
+      const formattedAvgFromDate = avgFromDate + ",00:00:00";
+      const formattedAvgToDate = avgToDate + ",23:59:59";
+      // console.log("average option tirggered");
+
+      if (averageOption === "hour") {
+        const rilAverageData = await InsertModel.aggregate([
+          {
+            $project: {
+              Sensor1: {
+                $cond: {
+                  if: { $eq: ["$Sensor1", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor1" },
+                },
+              },
+              Sensor2: {
+                $cond: {
+                  if: { $eq: ["$Sensor2", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor2" },
+                },
+              },
+              Sensor3: {
+                $cond: {
+                  if: { $eq: ["$Sensor3", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor3" },
+                },
+              },
+
+              hour: {
+                $dateToString: {
+                  format: "%Y-%m-%d,%H:00:00",
+                  date: { $dateFromString: { dateString: "$Time" } },
+                },
+              },
+            },
+          },
+          {
+            $group: {
+              _id: "$hour",
+              avgS1: { $avg: "$Sensor1" },
+              avgS2: { $avg: "$Sensor2" },
+              avgS3: { $avg: "$Sensor3" },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              dateRange: {
+                $concat: [
+                  "$_id",
+                  " to ",
+                  {
+                    $dateToString: {
+                      format: "%Y-%m-%d,%H:00:00",
+                      date: {
+                        $dateAdd: {
+                          startDate: {
+                            $dateFromString: { dateString: "$_id" },
+                          },
+                          unit: "hour",
+                          amount: 1,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+              avgS1: 1,
+              avgS2: 1,
+              avgS3: 1,
+            },
+          },
+          {
+            $sort: { dateRange: -1 },
+          },
+        ]);
+
+        if (rilAverageData.length > 0) {
+          const filteredData = rilAverageData
+            .filter((data) => {
+              const dbDate = data.dateRange.split(" to ")[0];
+              return (
+                dbDate >= formattedAvgFromDate && dbDate < formattedAvgToDate
+              );
+            })
+            .map((data) => {
+              return {
+                ...data,
+                avgS1:
+                  data.avgS1 !== null
+                    ? parseFloat(data.avgS1).toFixed(1)
+                    : "N/A",
+                avgS2:
+                  data.avgS2 !== null
+                    ? parseFloat(data.avgS2).toFixed(1)
+                    : "N/A",
+                avgS3:
+                  data.avgS3 !== null
+                    ? parseFloat(data.avgS3).toFixed(1)
+                    : "N/A",
+              };
+            });
+
+          res.status(200).json({ data: filteredData });
+        } else {
+          res.status(200).json([]);
+        }
+      } else if (averageOption === "day") {
+        const rilAverageData = await InsertModel.aggregate([
+          {
+            $project: {
+              Sensor1: {
+                $cond: {
+                  if: { $eq: ["$Sensor1", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor1" },
+                },
+              },
+              Sensor2: {
+                $cond: {
+                  if: { $eq: ["$Sensor2", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor2" },
+                },
+              },
+              Sensor3: {
+                $cond: {
+                  if: { $eq: ["$Sensor3", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor3" },
+                },
+              },
+              day: {
+                $dateToString: {
+                  format: "%Y-%m-%d,00:00:00",
+                  date: { $dateFromString: { dateString: "$Time" } },
+                },
+              },
+            },
+          },
+          {
+            $group: {
+              _id: "$day",
+              avgS1: { $avg: "$Sensor1" },
+              avgS2: { $avg: "$Sensor2" },
+              avgS3: { $avg: "$Sensor3" },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              dateRange: {
+                $concat: [
+                  "$_id",
+                  " to ",
+                  {
+                    $dateToString: {
+                      format: "%Y-%m-%d,00:00:00",
+                      date: {
+                        $dateAdd: {
+                          startDate: {
+                            $dateFromString: { dateString: "$_id" },
+                          },
+                          unit: "day",
+                          amount: 1,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+              avgS1: 1,
+              avgS2: 1,
+              avgS3: 1,
+            },
+          },
+          {
+            $sort: { dateRange: -1 },
+          },
+        ]);
+
+        if (rilAverageData.length > 0) {
+          const filteredData = rilAverageData
+            .filter((data) => {
+              const dbDate = data.dateRange.split(" to ")[0];
+              return (
+                dbDate >= formattedAvgFromDate && dbDate < formattedAvgToDate
+              );
+            })
+            .map((data) => {
+              return {
+                ...data,
+                avgS1:
+                  data.avgS1 !== null
+                    ? parseFloat(data.avgS1).toFixed(1)
+                    : "N/A",
+                avgS2:
+                  data.avgS2 !== null
+                    ? parseFloat(data.avgS2).toFixed(1)
+                    : "N/A",
+                avgS3:
+                  data.avgS3 !== null
+                    ? parseFloat(data.avgS3).toFixed(1)
+                    : "N/A",
+              };
+            });
+
+          res.status(200).json({ data: filteredData });
+        } else {
+          res.status(200).json([]);
+        }
+      }
+    }
+    // interval option
+    else if (intervalFromDate && intervalToDate) {
+      const formattedIntervalFromDate = intervalFromDate + ",00:00:00";
+      const formattedIntervalToDate = intervalToDate + ",23:59:59";
+
+      // console.log("interval option triggered");
+      if (intervalOption === "hour") {
+        const rilHourlyData = await InsertModel.aggregate([
+          {
+            $project: {
+              Sensor1: {
+                $cond: {
+                  if: { $eq: ["$Sensor1", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor1" },
+                },
+              },
+              Sensor2: {
+                $cond: {
+                  if: { $eq: ["$Sensor2", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor2" },
+                },
+              },
+              Sensor3: {
+                $cond: {
+                  if: { $eq: ["$Sensor3", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor3" },
+                },
+              },
+              originalTime: "$Time",
+              hour: {
+                $dateToString: {
+                  format: "%Y-%m-%d,%H:00:00",
+                  date: { $dateFromString: { dateString: "$Time" } },
+                },
+              },
+            },
+          },
+          {
+            $group: {
+              _id: "$hour", // Group by hour
+              firstDocument: { $first: "$$ROOT" }, // Get the first document in each hour
+            },
+          },
+          {
+            $replaceRoot: { newRoot: "$firstDocument" }, // Replace the root with the first document
+          },
+          {
+            $project: {
+              _id: 0, // Exclude the _id field
+              Sensor1: 1,
+              Sensor2: 1,
+              Sensor3: 1,
+              Time: "$originalTime", // Include hour if needed
+            },
+          },
+        ]);
+
+        if (rilHourlyData.length > 0) {
+          const filteredData = rilHourlyData
+            .filter((data) => {
+              const dbDate = data.Time;
+              return (
+                dbDate >= formattedIntervalFromDate &&
+                dbDate < formattedIntervalToDate
+              );
+            })
+            .sort((a, b) => {
+              const [dateA, timeA] = a.Time.split(",");
+              const [dateB, timeB] = b.Time.split(",");
+
+              const [yearA, monthA, dayA] = dateA.split("-").map(Number);
+              const [hourA, minuteA, secondA] = timeA.split(":").map(Number);
+
+              const [yearB, monthB, dayB] = dateB.split("-").map(Number);
+              const [hourB, minuteB, secondB] = timeB.split(":").map(Number);
+
+              const aNumeric =
+                yearA * 10000000000 +
+                monthA * 100000000 +
+                dayA * 1000000 +
+                hourA * 10000 +
+                minuteA * 100 +
+                secondA;
+              const bNumeric =
+                yearB * 10000000000 +
+                monthB * 100000000 +
+                dayB * 1000000 +
+                hourB * 10000 +
+                minuteB * 100 +
+                secondB;
+
+              return bNumeric - aNumeric;
+            });
+
+          res.json({ success: true, data: filteredData });
+        } else {
+          res.json({ success: false, message: "Data not found" });
+        }
+      } else if (intervalOption === "day") {
+        const rilHourlyData = await InsertModel.aggregate([
+          {
+            $project: {
+              Sensor1: {
+                $cond: {
+                  if: { $eq: ["$Sensor1", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor1" },
+                },
+              },
+              Sensor2: {
+                $cond: {
+                  if: { $eq: ["$Sensor2", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor2" },
+                },
+              },
+              Sensor3: {
+                $cond: {
+                  if: { $eq: ["$Sensor3", "N/A"] },
+                  then: null,
+                  else: { $toDouble: "$Sensor3" },
+                },
+              },
+              originalTime: "$Time",
+              day: {
+                $dateToString: {
+                  format: "%Y-%m-%d,00:00:00",
+                  date: { $dateFromString: { dateString: "$Time" } },
+                },
+              },
+            },
+          },
+          {
+            $group: {
+              _id: "$day",
+              firstDocument: { $first: "$$ROOT" },
+            },
+          },
+          {
+            $replaceRoot: { newRoot: "$firstDocument" },
+          },
+          {
+            $project: {
+              _id: 0, // Exclude the _id field
+              Sensor1: 1,
+              Sensor2: 1,
+              Sensor3: 1,
+              Time: "$originalTime", // Include hour if needed
+            },
+          },
+        ]);
+
+        if (rilHourlyData.length > 0) {
+          const filteredData = rilHourlyData
+            .filter((data) => {
+              const dbDate = data.Time;
+              return (
+                dbDate >= formattedIntervalFromDate &&
+                dbDate < formattedIntervalToDate
+              );
+            })
+            .sort((a, b) => {
+              const [dateA, timeA] = a.Time.split(",");
+              const [dateB, timeB] = b.Time.split(",");
+
+              const [yearA, monthA, dayA] = dateA.split("-").map(Number);
+              const [hourA, minuteA, secondA] = timeA.split(":").map(Number);
+
+              const [yearB, monthB, dayB] = dateB.split("-").map(Number);
+              const [hourB, minuteB, secondB] = timeB.split(":").map(Number);
+
+              const aNumeric =
+                yearA * 10000000000 +
+                monthA * 100000000 +
+                dayA * 1000000 +
+                hourA * 10000 +
+                minuteA * 100 +
+                secondA;
+              const bNumeric =
+                yearB * 10000000000 +
+                monthB * 100000000 +
+                dayB * 1000000 +
+                hourB * 10000 +
+                minuteB * 100 +
+                secondB;
+
+              return bNumeric - aNumeric;
+            });
+
+          res.json({ success: true, data: filteredData });
+        } else {
+          res.json({ success: false, message: "Data not found" });
+        }
+      }
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error });
   }
 };

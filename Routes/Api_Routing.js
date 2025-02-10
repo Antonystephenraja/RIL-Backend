@@ -8,6 +8,7 @@ import {
   GetData,
   InsetLimit,
   getRilReport,
+  getRilAverageReport,
 } from "../api_v1/api.js";
 
 const router = express.Router();
@@ -19,5 +20,6 @@ router.get("/Auth", insertAuth);
 router.get("/DataCollection", GetData);
 router.post("/InserLimit", InsetLimit);
 router.get("/getRilReport", getRilReport);
+router.get("/getRilAverageReport", getRilAverageReport);
 
 export default router;
