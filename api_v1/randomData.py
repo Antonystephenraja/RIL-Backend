@@ -8,7 +8,7 @@ import random
 url = "http://localhost:4000/backend/InsertData"
 
 # Authorization token
-token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InN0ZXBoZW4iLCJpYXQiOjE3Mzg4NDAyMTJ9.ztKSnEAPSqrIJBj0aNVtWDi1CbvKbYQ_qbR6hKXAnHc"
+token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InN0ZXBoZW4iLCJpYXQiOjE3MzYzNDI3MTl9.1UdvBNgSAQV2RZsuq5N9xUJ9A3aIOQmq8EPzcJdPAs8"
 
 # Headers with Authorization token
 headers = {
@@ -44,4 +44,4 @@ while True:
         print("Error:", str(e))
 
     # Wait for 1 second before sending the next request
-    time.sleep(10)
+    time.sleep(0.2)

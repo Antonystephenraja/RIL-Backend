@@ -8,6 +8,7 @@ const app = express();
 const connect = async () => {
   try {
     await mongoose.connect("mongodb://127.0.0.1:27017/RIL_Database");
+    
     console.log("MongoDB Connected ...");
   } catch (error) {
     throw error;
