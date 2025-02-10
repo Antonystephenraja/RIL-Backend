@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 import random
 
-# API endpoint
+# API endpoints
 url = "http://localhost:4000/backend/InsertData"
 
 # Authorization token
