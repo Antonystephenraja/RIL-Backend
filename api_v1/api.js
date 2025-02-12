@@ -954,8 +954,11 @@ export const getRilReport = async (req, res) => {
       count,
     } = req.query;
 
+    // console.log("req query", req.query);
+
     // date picker
     if (fromDate && toDate) {
+      // console.log("date picker triggered");
       const formattedFromDate = fromDate + ",00:00:00";
       const formattedToDate = toDate + ",23:59:59";
 
@@ -969,6 +972,8 @@ export const getRilReport = async (req, res) => {
         .select({
           _id: 0,
           __v: 0,
+          Id: 0,
+          Sensor4: 0,
         });
 
       if (data.length > 0) {
@@ -979,12 +984,15 @@ export const getRilReport = async (req, res) => {
     }
     // countwise option
     else if (count) {
+      // console.log("count option triggered");
       const data = await InsertModel.find({})
         .limit(count)
         .sort({ _id: -1 })
         .select({
           _id: 0,
           __v: 0,
+          Id: 0,
+          Sensor4: 0,
         });
       if (data.length > 0) {
         res.status(200).json(data);
