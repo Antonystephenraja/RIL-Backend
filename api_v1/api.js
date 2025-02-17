@@ -173,7 +173,7 @@ export const Insert = async (req, res) => {
           from: "stephen@xyma.in",
           to: "stephen@xyma.in,kalidass@xyma.in,jamesh@xyma.in",
           subject: "⚠️ Alert: Temperature Exceeded Safe Levels",
-          text: `Alert: Temperature exceeded safe levels.\n\nSensor: ${alertSensor}\nRecorded Temperature: ${recordedTemperature}°C\nAsset Location: ROGC Furnace, 4th Pass\n\nImmediate action is required to prevent potential incidents.`,
+          text: `Alert: Temperature exceeded safe levels.\n\nSensor: ${alertSensor}\nRecorded Temperature: ${recordedTemperature}°C\nAsset Location: ROGC Furnace, 4th Pass.`,
         };
 
         transporter.sendMail(mailOptions, async (error, info) => {
