@@ -9,10 +9,11 @@ import {
   InsetLimit,
   getRilReport,
   getRilAverageReport,
+  AutoReport,
 } from "../api_v1/api.js";
 
 const router = express.Router();
-router.get("/hindalcoSignup", signup);
+router.post("/signup", signup);
 router.post("/login", login);
 router.post("/validateToken", validateToken);
 router.post("/InsertData", Insert);
@@ -21,5 +22,6 @@ router.get("/DataCollection", GetData);
 router.post("/InserLimit", InsetLimit);
 router.get("/getRilReport", getRilReport);
 router.get("/getRilAverageReport", getRilAverageReport);
+router.get("/autoreport",AutoReport)
 
 export default router;

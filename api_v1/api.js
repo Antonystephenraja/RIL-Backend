@@ -1,38 +1,62 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import axios from "axios";
-import loginModel from "../Models/Login.js";
+import { ChartJSNodeCanvas } from "chartjs-node-canvas";
+import PDFDocument from "pdfkit"
+import fs from 'fs';
+import nodemailer from "nodemailer";
+import cron from "node-cron";
 import InsertModel from "../Models/InsertModel.js";
 import InsertLimit from "../Models/Inser_Limit.js";
-
 import AuthModel from "../Models/Insert_Auth.js";
+import path from "path";
+import streamBuffers from "stream-buffers";
+import { fileURLToPath } from "url";
+import moment from "moment/moment.js";
+import AlertSystem from "../Models/AlertModel.js";
+import loginModel from "../Models/LoginModel.js";
 
-// http://localhost:4000/backend/hindalcoSignup?Username=[username]&Password=[password]
-export const signup = (req, res) => {
-  const { Username, Password } = req.query;
-  bcrypt
-    .hash(Password, 10)
-    .then((hash) => {
-      loginModel
-        .create({ Username, Password: hash })
-        .then((info) => res.json(info))
-        .catch((err) => res.json(err));
-    })
-    .catch((error) => console.log(error));
+
+//from mail address
+const transporter = nodemailer.createTransport({
+  service: "Outlook",
+  auth: {
+    user: "stephen@xyma.in",
+    pass: "psvkysktpfydgddy",
+  },
+});
+
+// http://localhost:4000/backend/signup?Username=[username]&Password=[password]
+export const signup = async (req, res) => {
+  try { 
+    const { UserName, Password,Role } = req.body;
+    if (!UserName || !Password ||!Role) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    const hashedPassword = await bcrypt.hash(Password, 10);
+    const newUser = await loginModel.create({
+      UserName,
+      Password: hashedPassword,
+      Role,
+    });
+    res.status(201).json({ message: "User registered successfully", user: newUser });
+  } catch (error) {
+    console.error("Error details:", error);
+    res.status(500).json({ message: "Error creating user", error: error.message });
+  }
 };
 
 // final
 export const login = (req, res) => {
-  const { Username, Password } = req.body;
+  const { UserName, Password } = req.body;
   loginModel
-    .findOne({ Username })
+    .findOne({ UserName })
     .then((user) => {
       if (user) {
         bcrypt.compare(Password, user.Password, (err, response) => {
           if (response) {
             const redirectUrl = "/";
             const token = jwt.sign(
-              { Username: user.Username },
+              { UserName: user.UserName },
               "jwt-secret-key-123"
             );
             res.json({ token, redirectUrl });
@@ -87,6 +111,7 @@ export const insertAuth = async (req, res) => {
   }
 };
 
+
 // http://localhost:4000/backend/InsertData
 export const Insert = async (req, res) => {
   const token = req.headers["authorization"];
@@ -102,7 +127,6 @@ export const Insert = async (req, res) => {
       return res.status(403).json({ message: "Invalid token" });
     }
     const { Id, Sensor1, Sensor2, Sensor3, Sensor4, Time } = req.body;
-    // const formattedTime = new Date(Time);
 
     // console.log("time=",Time,"And formated time=",formattedTime)
     const newData = new InsertModel({
@@ -115,9 +139,62 @@ export const Insert = async (req, res) => {
     });
 
     await newData.save();
+    let alertSensor = null;
+    let recordedTemperature = null;
+
+    if (Sensor1 > 1050) {
+      alertSensor = "Sensor1";
+      recordedTemperature = Sensor1;
+    } else if (Sensor2 > 1050) {
+      alertSensor = "Sensor2";
+      recordedTemperature = Sensor2;
+    } else if (Sensor3 > 1050) {
+      alertSensor = "Sensor3";
+      recordedTemperature = Sensor3;
+    }
+
+    if (alertSensor) {
+      // Check last alert timestamp
+      const lastAlert = await AlertSystem.findOne({ sensor: alertSensor });
+      const currentTime = moment();
+      let shouldSendAlert = false;
+      if (!lastAlert) {
+        shouldSendAlert = true;
+      } else {
+        const lastAlertTime = moment(lastAlert.lastSent);
+        const minutesDiff = currentTime.diff(lastAlertTime, "minutes");
+        if (minutesDiff >= 10) {
+          shouldSendAlert = true; // Send alert only if 10 minutes have passed
+        }
+      }
+
+      if (shouldSendAlert) {
+        const mailOptions = {
+          from: "stephen@xyma.in",
+          to: "stephen@xyma.in,kalidass@xyma.in,jamesh@xyma.in",
+          subject: "⚠️ Alert: Temperature Exceeded Safe Levels",
+          text: `Alert: Temperature exceeded safe levels.\n\nSensor: ${alertSensor}\nRecorded Temperature: ${recordedTemperature}°C\nAsset Location: ROGC Furnace, 4th Pass\n\nImmediate action is required to prevent potential incidents.`,
+        };
+
+        transporter.sendMail(mailOptions, async (error, info) => {
+          if (error) {
+            console.error("Error sending email:", error);
+          } else {
+            console.log("Alert email sent:", info.response);
+            // Update or create last alert time
+            if (!lastAlert) {
+              await AlertSystem.create({ sensor: alertSensor, lastSent: currentTime });
+            } else {
+              await AlertSystem.updateOne({ sensor: alertSensor }, { lastSent: currentTime });
+            }
+          }
+        });
+      }
+    }
     return res
       .status(200)
       .json({ message: "Data inserted successfully", data: newData });
+      
   } catch (error) {
     return res
       .status(401)
@@ -132,6 +209,7 @@ export const InsetLimit = async (req, res) => {
     const existingData = await InsertLimit.findOne({ Id: "0001" });
     if (existingData) {
       let updateData = {};
+
       if (id === 1) {
         updateData.MinLimit = Minvalue;
       } else if (id === 2) {
@@ -523,7 +601,7 @@ export const GetData = async (req, res) => {
     // last 12 hr data
     else if (data_stage === "12hr") {
       // console.log("yes")
-
+    
       const currentTimeMinusTwelveHr = new Date(
         currentDateTime.getTime() - 12 * 60 * 60 * 1000
       );
@@ -1440,3 +1518,351 @@ export const getRilAverageReport = async (req, res) => {
     res.status(500).json({ success: false, message: error });
   }
 };
+
+
+
+const width = 800;
+const height = 400;
+let sensor1Data = [];
+let sensor2Data = [];
+let sensor3Data = [];
+let TimestampData = [];
+
+const generateChart = async () => {
+
+const today5PM = moment().set({ hour: 17, minute: 0, second: 0 }).format("YYYY-MM-DD,HH:mm:ss");
+const yesterday5PM = moment().subtract(1, "day").set({ hour: 17, minute: 0, second: 0 }).format("YYYY-MM-DD,HH:mm:ss");
+
+  const data = await InsertModel.find({
+    Time: {
+      $gte: yesterday5PM,
+      $lte: today5PM,
+    },
+  }).sort({ _id: -1 });
+
+// console.log("response data=",data)
+ 
+
+ if (data.length > 0) {
+  sensor1Data = data.map((item) => item.Sensor1);
+  sensor2Data = data.map((item) => item.Sensor2);
+  sensor3Data = data.map((item) => item.Sensor3);
+  TimestampData = data.map((item) => item.Time);
+
+  }else{
+    console.log("No Data there at the day")
+  
+  }
+
+
+  const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height });
+  const configuration = {
+    type: "line",
+    data: {
+      labels: TimestampData.reverse(),
+      datasets: [
+        {
+          label: "Sensor1",
+          data: sensor1Data.reverse(),
+          borderColor: "#04f5b7",
+          backgroundColor: "rgba(76, 175, 80, 0.2)",
+          fill: false,
+          pointRadius: 0,
+          pointHoverRadius: 2,
+          tension: 0.2,
+          borderWidth: 3,
+        },
+        {
+          label: "Sensor2",
+          data: sensor2Data.reverse(),
+          borderColor: "#d77806",
+          backgroundColor: "rgba(76, 175, 80, 0.2)",
+          fill: false,
+          pointRadius: 0,
+          pointHoverRadius: 2,
+          tension: 0.2,
+          borderWidth: 3,
+        },
+        {
+          label: "Sensor3",
+          data: sensor3Data.reverse(),
+          borderColor: "#cedb02",
+          backgroundColor: "rgba(76, 175, 80, 0.2)",
+           fill: false,
+          pointRadius: 0,
+          pointHoverRadius: 2,
+          tension: 0.2,
+          borderWidth: 3,
+        },
+      ],
+    },
+    
+  };
+  return await chartJSNodeCanvas.renderToBuffer(configuration);
+};
+
+let tableData=[];
+const hour_interval =async()=>{
+  const rilHourlyData = await InsertModel.aggregate([
+    {
+      $project: {
+        Sensor1: {
+          $cond: {
+            if: { $eq: ["$Sensor1", "N/A"] },
+            then: null,
+            else: { $toDouble: "$Sensor1" },
+          },
+        },
+        Sensor2: {
+          $cond: {
+            if: { $eq: ["$Sensor2", "N/A"] },
+            then: null,
+            else: { $toDouble: "$Sensor2" },
+          },
+        },
+        Sensor3: {
+          $cond: {
+            if: { $eq: ["$Sensor3", "N/A"] },
+            then: null,
+            else: { $toDouble: "$Sensor3" },
+          },
+        },
+        originalTime: "$Time",
+        hour: {
+          $dateToString: {
+            format: "%Y-%m-%d,%H:00:00",
+            date: { $dateFromString: { dateString: "$Time" } },
+          },
+        },
+      },
+    },
+    {
+      $group: {
+        _id: "$hour", // Group by hour
+        firstDocument: { $first: "$$ROOT" }, // Get the first document in each hour
+      },
+    },
+    {
+      $replaceRoot: { newRoot: "$firstDocument" }, // Replace the root with the first document
+    },
+    {
+      $project: {
+        _id: 0, // Exclude the _id field
+        Sensor1: 1,
+        Sensor2: 1,
+        Sensor3: 1,
+        Time: "$originalTime", // Include hour if needed
+      },
+    },
+  ]);
+
+  if (rilHourlyData.length > 0) {
+    tableData = rilHourlyData
+      .filter((data) => {
+        const dbDate = data.Time;
+        return (
+          dbDate >= moment().subtract(1, "day").set({ hour: 17, minute: 0, second: 0 }).format("YYYY-MM-DD,HH:mm:ss") &&
+          dbDate < moment().set({ hour: 17, minute: 0, second: 0 }).format("YYYY-MM-DD,HH:mm:ss")
+        );
+      })
+      .sort((a, b) => {
+        const [dateA, timeA] = a.Time.split(",");
+        const [dateB, timeB] = b.Time.split(",");
+
+        const [yearA, monthA, dayA] = dateA.split("-").map(Number);
+        const [hourA, minuteA, secondA] = timeA.split(":").map(Number);
+
+        const [yearB, monthB, dayB] = dateB.split("-").map(Number);
+        const [hourB, minuteB, secondB] = timeB.split(":").map(Number);
+
+        const aNumeric =
+          yearA * 10000000000 +
+          monthA * 100000000 +
+          dayA * 1000000 +
+          hourA * 10000 +
+          minuteA * 100 +
+          secondA;
+        const bNumeric =
+          yearB * 10000000000 +
+          monthB * 100000000 +
+          dayB * 1000000 +
+          hourB * 10000 +
+          minuteB * 100 +
+          secondB;
+        return bNumeric - aNumeric;
+      });
+  } else {
+    console.log("Data not Found")
+    tableData = [];
+    res.json({ success: false, message: "Data not found" });
+  }
+}
+
+const generatePDF = async () => {
+
+  return new Promise(async (resolve, reject) => {
+    const today5PM = moment().set({ hour: 17, minute: 0, second: 0 }).format("YYYY-MM-DD,HH:mm:ss");
+const yesterday5PM = moment().subtract(1, "day").set({ hour: 17, minute: 0, second: 0 }).format("YYYY-MM-DD,HH:mm:ss");
+
+    const doc = new PDFDocument({ margin: 50 });
+    const bufferStream = new streamBuffers.WritableStreamBuffer();
+    doc.pipe(bufferStream);
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+
+    // **Cover Page**
+    const logoPath = path.join(__dirname, "../Assets/xyma_blue.png");
+    const coverPath = path.join(__dirname, "../Assets/pdfcover.jpg");
+    const disclaimer = path.join(__dirname, "../Assets/disclaimerPage.jpg");
+
+    if (fs.existsSync(coverPath)) {
+      doc.image(coverPath, 0, 0, { width: 600, height: 800 });
+    }
+
+ 
+    doc.addPage();
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 500, 30, { width: 80, height: 50 });
+      doc.moveDown(2); // Add space after the logo
+    }
+    
+    // **Title**
+    doc.font("Helvetica-Bold").fontSize(20).fillColor("#f18e00").text("Daily Sensor Report", { align: "center" });
+    doc.moveDown(2);
+  // **Ensure text starts after the chart (Fixing Overlap)**
+
+
+  // **Company Description**
+  doc.font("Helvetica").fontSize(12).fillColor("#333").text(
+    "utmaps XYMA Manufactures unique ultrasonic waveguide-based sensors to address the critical need of industries in High-Temperature applications.Our Sensors are Enhanced with industrial IoT and Physics-based soft sensing to enhance industrial automation.",
+    { align: "justify" }
+  );
+  doc.moveDown(2);
+
+  // **Asset Information**
+  doc.font("Helvetica-Bold").fontSize(12).fillColor("#000").text("Sensor Id:", { continued: true })
+    .font("Helvetica").text(" XY001", { underline: false });
+
+  doc.font("Helvetica-Bold").text("Plant:", { continued: true })
+    .font("Helvetica").text(" RIL C2,Jamnagar", { underline: false });
+
+  doc.font("Helvetica-Bold").text("Coil No:", { continued: true })
+    .font("Helvetica").text("39", { underline: false });
+
+  doc.font("Helvetica-Bold").text("Asset:", { continued: true })
+    .font("Helvetica").text(" ROGC Furnace", { underline: false });
+
+    doc.font("Helvetica-Bold").text("Sensor Location:", { continued: true })
+    .font("Helvetica").text(" 4th Pass,last 5 meter", { underline: false });
+    doc.moveDown(2);
+    const chartImage = await generateChart();
+    doc.image(chartImage, 50, doc.y, { width: 500, height: 250 });
+    doc.moveDown(20); 
+
+    doc.font("Helvetica").text(
+      `The table below presents hourly interval data recorded from ${yesterday5PM}, to ${today5PM}. This dataset provides valuable insights into sensor performance over time, enabling trend analysis and anomaly detection. The recorded values help in monitoring system efficiency.`,
+      { align: "justify" }
+    );
+
+     doc.moveDown(2); 
+     
+    await hour_interval(); 
+
+    // **Start Table**
+    const startX = 50;
+    let yPosition = doc.y;
+    const rowHeight = 20;
+    const colWidths = [50, 100, 100, 100, 150];
+    const pageHeight = 750;
+
+    // **Table Header**
+    doc.fillColor("#FFF")
+      .rect(startX, yPosition, colWidths.reduce((a, b) => a + b), rowHeight)
+      .fill("#f18e00");
+
+    doc.fillColor("#FFF").fontSize(12)
+      .text("S.No", startX + 10, yPosition + 10)
+      .text("Sensor1", startX + colWidths[0] + 10, yPosition + 10)
+      .text("Sensor2", startX + colWidths[0] + colWidths[1] + 10, yPosition + 10)
+      .text("Sensor3", startX + colWidths[0] + colWidths[1] + colWidths[2] + 10, yPosition + 10)
+      .text("Time", startX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 10, yPosition + 10);
+
+    yPosition += rowHeight;
+
+    // **Table Data**
+    tableData.forEach((row, index) => {
+      if (yPosition + rowHeight > pageHeight) {
+        doc.addPage();
+        yPosition = 50;
+      }
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 500, 30, { width: 80, height: 50 });
+      }
+
+      doc.fillColor(index % 2 === 0 ? "#F0F0F0" : "#FFF")
+        .rect(startX, yPosition, colWidths.reduce((a, b) => a + b), rowHeight)
+        .fill();
+
+      doc.fillColor("#333").fontSize(10)
+        .text(index + 1, startX + 10, yPosition + 10)
+        .text(row.Sensor1?.toString() || "N/A", startX + colWidths[0] + 10, yPosition + 10)
+        .text(row.Sensor2?.toString() || "N/A", startX + colWidths[0] + colWidths[1] + 10, yPosition + 10)
+        .text(row.Sensor3?.toString() || "N/A", startX + colWidths[0] + colWidths[1] + colWidths[2] + 10, yPosition + 10)
+        .text(row.Time || "N/A", startX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 10, yPosition + 10);
+
+      yPosition += rowHeight;
+    });
+    doc.addPage(); // Add a new page for the A4 image
+
+    if (fs.existsSync(disclaimer)) {
+      doc.image(disclaimer, 0, 0, { width: 595, height: 842 }); // Full A4 size
+  }
+
+    doc.end();
+
+    bufferStream.on("finish", () => resolve(bufferStream.getContents()));
+    bufferStream.on("error", reject);
+  });
+};
+
+
+
+// Send email with PDF attachment
+const sendEmail = async () => {
+  const pdfBuffer = await generatePDF();
+
+ 
+
+  const mailOptions = {
+    from: "stephen@xyma.in",
+    to: "antonystephen060696@gmail.com",
+    subject: "Daily Sensor Report",
+    text: "Attached is the daily sensor report.",
+    attachments: [{ filename: "daily_report.pdf", content: pdfBuffer }],
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error("Error sending email: ", error);
+    } else {
+      console.log("Email sent: ", info.response);
+    }
+  });
+};
+
+// API route to trigger report manually
+export const AutoReport = async (req, res) => {
+  try {
+    await sendEmail();
+    res.status(200).json({ message: "Daily report sent successfully!" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to send report." });
+  }
+};
+
+// Schedule report at 17:00 (5:00 PM) daily
+cron.schedule("0 17 * * *", () => {
+  console.log("Generating and sending daily report...");
+  sendEmail();
+});
+
