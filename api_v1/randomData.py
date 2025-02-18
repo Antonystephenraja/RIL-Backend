@@ -8,7 +8,7 @@ import random
 url = "http://localhost:4000/backend/InsertData"
 
 # Authorization token
-token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InN0ZXBoZW4iLCJpYXQiOjE3MzkzNjI1MzZ9.J71aUx1Ck0ojvTYkW2udDg4T0MNXO5Il4vFbjglZgfI"
+token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InN0ZXBoZW4iLCJpYXQiOjE3MzYzNDI3MTl9.1UdvBNgSAQV2RZsuq5N9xUJ9A3aIOQmq8EPzcJdPAs8"
 
 # Headers with Authorization token
 headers = {
@@ -25,10 +25,10 @@ while True:
     # Random sensor values
     data = {
         "Id": "XY001",
-        "Sensor1": "nan",
-        "Sensor2": "nan",
-        "Sensor3": "nan",
-        "Sensor4": "nan",
+        "Sensor1": random.randint(1000, 1050),
+        "Sensor2": random.randint(1000, 1050),
+        "Sensor3": random.randint(600, 1050),
+        "Sensor4": "N/A",
         "Time": current_time,  # Formatted timestamp
     }
 
@@ -44,4 +44,4 @@ while True:
         print("Error:", str(e))
 
     # Wait for 1 second before sending the next request
-    time.sleep(20)
+    time.sleep(30)

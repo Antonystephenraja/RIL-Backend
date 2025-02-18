@@ -127,7 +127,6 @@ export const Insert = async (req, res) => {
       return res.status(403).json({ message: "Invalid token" });
     }
     const { Id, Sensor1, Sensor2, Sensor3, Sensor4, Time } = req.body;
-
     // console.log("time=",Time,"And formated time=",formattedTime)
     const newData = new InsertModel({
       Id,
@@ -142,13 +141,13 @@ export const Insert = async (req, res) => {
     let alertSensor = null;
     let recordedTemperature = null;
 
-    if (Sensor1 > 1050) {
+    if(Sensor1 > 1050) {
       alertSensor = "Sensor1";
       recordedTemperature = Sensor1;
-    } else if (Sensor2 > 1050) {
+    }if (Sensor2 > 1050) {
       alertSensor = "Sensor2";
       recordedTemperature = Sensor2;
-    } else if (Sensor3 > 1050) {
+    }if (Sensor3 > 1050) {
       alertSensor = "Sensor3";
       recordedTemperature = Sensor3;
     }
@@ -167,13 +166,16 @@ export const Insert = async (req, res) => {
           shouldSendAlert = true; // Send alert only if 10 minutes have passed
         }
       }
+      const allmail_id = await loginModel.find({},"UserName");
+      const userMailIds=allmail_id.map(user =>user.UserName).join(",")
+      console.log("alldata=",userMailIds)
 
       if (shouldSendAlert) {
         const mailOptions = {
           from: "stephen@xyma.in",
-          to: "stephen@xyma.in,kalidass@xyma.in,jamesh@xyma.in",
+          to: "stephen@xyma.in",
           subject: "⚠️ Alert: Temperature Exceeded Safe Levels",
-          text: `Alert: Temperature exceeded safe levels.\n\nSensor: ${alertSensor}\nRecorded Temperature: ${recordedTemperature}°C\nAsset Location: ROGC Furnace, 4th Pass.`,
+          text: `Alert: Temperature exceeded safe levels.\n\nSensor: ${alertSensor}\nRecorded Temperature: ${recordedTemperature}°C\nTube Number:39\nAsset Location: ROGC Furnace, 4th Pass.`,
         };
 
         transporter.sendMail(mailOptions, async (error, info) => {
@@ -243,15 +245,186 @@ export const InsetLimit = async (req, res) => {
   }
 };
 
-let previousCount = 0;
+let Deltavalues = 0;
 
+
+const intervalofhour=async(onehourbeforedata,formattedCurrentTimeMinusOneHr)=>{
+  const formattedIntervalFromDate = onehourbeforedata + ",00:00:00";
+  const formattedIntervalToDate = formattedCurrentTimeMinusOneHr + ",23:59:59";
+  // console.log("interval option triggered");
+
+  // console.log("from date=",formattedIntervalFromDate)
+  // console.log("to date=",formattedIntervalToDate)
+
+    const rilHourlyData = await InsertModel.aggregate([
+      {
+        $project: {
+          Sensor1: {
+            $cond: {
+              if: { $eq: ["$Sensor1", "N/A"] },
+              then: null,
+              else: { $toDouble: "$Sensor1" },
+            },
+          },
+          Sensor2: {
+            $cond: {
+              if: { $eq: ["$Sensor2", "N/A"] },
+              then: null,
+              else: { $toDouble: "$Sensor2" },
+            },
+          },
+          Sensor3: {
+            $cond: {
+              if: { $eq: ["$Sensor3", "N/A"] },
+              then: null,
+              else: { $toDouble: "$Sensor3" },
+            },
+          },
+          originalTime: "$Time",
+          hour: {
+            $dateToString: {
+              format: "%Y-%m-%d,%H:%M:00",
+              // date: { $dateFromString: { dateString: "$Time" } },
+              date: {
+                $subtract: [
+                  { $dateFromString: { dateString: "$Time" } },
+                  {
+                    $multiply: [
+                      { $mod: [{ $minute: { $dateFromString: { dateString: "$Time" } } }, 5] },
+                      60 * 1000,
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$hour", // Group by hour
+          firstDocument: { $first: "$$ROOT" }, // Get the first document in each hour
+        },
+      },
+      {
+        $replaceRoot: { newRoot: "$firstDocument" }, // Replace the root with the first document
+      },
+      {
+        $project: {
+          _id: 0, // Exclude the _id field
+          Sensor1: 1,
+          Sensor2: 1,
+          Sensor3: 1,
+          Time: "$originalTime", // Include hour if needed
+        },
+      },
+    ]);
+
+    if (rilHourlyData.length > 0) {
+      const filteredData = rilHourlyData
+        .filter((data) => {
+          const dbDate = data.Time;
+          return (
+            dbDate >= formattedIntervalFromDate &&
+            dbDate < formattedIntervalToDate
+          );
+        })
+        .sort((a, b) => {
+          const [dateA, timeA] = a.Time.split(",");
+          const [dateB, timeB] = b.Time.split(",");
+
+          const [yearA, monthA, dayA] = dateA.split("-").map(Number);
+          const [hourA, minuteA, secondA] = timeA.split(":").map(Number);
+
+          const [yearB, monthB, dayB] = dateB.split("-").map(Number);
+          const [hourB, minuteB, secondB] = timeB.split(":").map(Number);
+
+          const aNumeric =
+            yearA * 10000000000 +
+            monthA * 100000000 +
+            dayA * 1000000 +
+            hourA * 10000 +
+            minuteA * 100 +
+            secondA;
+          const bNumeric =
+            yearB * 10000000000 +
+            monthB * 100000000 +
+            dayB * 1000000 +
+            hourB * 10000 +
+            minuteB * 100 +
+            secondB;
+
+          return bNumeric - aNumeric;
+        });
+      // console.log("filteredData=",filteredData)
+
+      const calculateDifferences = (data) => {
+        // Sort data by time (in case it's not already sorted)
+        data.sort((a, b) => new Date(a.Time) - new Date(b.Time));
+
+        const differences = [];
+
+        for (let i = 1; i < data.length; i++) {
+          const prevEntry = data[i - 1];
+          const currentEntry = data[i];
+          // console.log("-----1st-----")
+          // console.log("prevEntry=",prevEntry)
+          // console.log("current entry=",currentEntry)
+          // console.log("-----End-----")
+
+          // Calculate the difference in Sensor1 (or any other sensor of interest)
+          const sensor1Diff = Math.abs(currentEntry.Sensor1 - prevEntry.Sensor1);
+          const sensor2Diff = Math.abs(currentEntry.Sensor2 - prevEntry.Sensor2);
+          const sensor3Diff = Math.abs(currentEntry.Sensor3 - prevEntry.Sensor3);
+
+          // Save the result with the time difference and the calculated difference in Sensor1
+          differences.push({
+            // Time1: prevEntry.Time,
+            // Time2: currentEntry.Time,
+            Sensor1Difference: sensor1Diff,
+            Sensor2Difference:sensor2Diff,
+            Sensor3Difference:sensor3Diff
+            // Sensor1_1: prevEntry.Sensor1,
+            // Sensor1_2: currentEntry.Sensor1
+          });
+        }
+        return differences;
+      };
+      
+
+      const result = calculateDifferences(filteredData);
+      // console.log("data=",result)
+      const calculateAverageDifference = (differences) => {
+        if (differences.length === 0) return 0; // Handle empty array case
+        const sensor_differences = [];
+
+        const total_senosr1 = differences.reduce((sum, entry) => sum + Math.abs(entry.Sensor1Difference), 0);
+        const total_senosr2 = differences.reduce((sum, entry) => sum + Math.abs(entry.Sensor2Difference), 0);
+        const total_senosr3 = differences.reduce((sum, entry) => sum + Math.abs(entry.Sensor3Difference), 0);
+
+        sensor_differences.push({
+          Temp1_R_Delta: Number((total_senosr1 / differences.length).toFixed(2)),
+          Temp2_R_Delta: Number((total_senosr2 / differences.length).toFixed(2)),
+          Temp3_R_Delta: Number((total_senosr3 / differences.length).toFixed(2)),
+          CurrentDelta: differences[differences.length - 1]
+        })
+        return sensor_differences;
+      };
+      const averageDifference = calculateAverageDifference(result);
+      // console.log("result=",averageDifference);
+      Deltavalues = averageDifference;
+    } else {
+      res.json({ success: false, message: "Data not found" });
+    }
+}
+
+
+let previousCount = 0;
 export const GetData = async (req, res) => {
   try {
     const data_stage = req.query.limit;
     const currentDateTime = new Date();
-
     // console.log("limit", data_stage);
-
     const kolkataTime = currentDateTime.toLocaleString("en-US", {
       timeZone: "Asia/Kolkata",
       hour12: false,
@@ -273,8 +446,6 @@ export const GetData = async (req, res) => {
       "0"
     )}-${day.padStart(2, "0")},${hours}:${minutes}:${seconds}`;
 
-    // console.log("current time", formattedCurrentTime);
-
     const limitData = await InsertLimit.findOne({}, "MinLimit MaxLimit");
     const count = await InsertModel.countDocuments({});
 
@@ -285,8 +456,18 @@ export const GetData = async (req, res) => {
       lastDataTime = activet_data.Time;
     }
 
+
     const timeDiffInMinutes =
       (new Date(formattedCurrentTime) - new Date(lastDataTime)) / (1000 * 60);
+
+
+    //define the before hour diffrent
+ 
+    const a = formattedCurrentTime.split(",")
+    const b = a[1].split(":");
+    const c = b[0]-1;
+    const onehourbeforedata = a[0]+","+c+":"+b[1]+":"+b[2]
+    await intervalofhour(onehourbeforedata,formattedCurrentTime);
 
     // last 1 hr data
     if (data_stage === "1hr") {
@@ -376,6 +557,7 @@ export const GetData = async (req, res) => {
           LimitData: limitData,
           value: activet_data,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
         };
 
         res.status(200).json(response);
@@ -386,6 +568,8 @@ export const GetData = async (req, res) => {
           value: activet_data,
           LimitData: limitData,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         });
         previousCount = count;
       }
@@ -485,6 +669,8 @@ export const GetData = async (req, res) => {
           LimitData: limitData,
           value: activet_data,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         };
 
         res.status(200).json(response);
@@ -495,6 +681,8 @@ export const GetData = async (req, res) => {
           value: activet_data,
           LimitData: limitData,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         });
         previousCount = count;
       }
@@ -584,6 +772,8 @@ export const GetData = async (req, res) => {
           LimitData: limitData,
           value: activet_data,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         };
 
         res.status(200).json(response);
@@ -594,6 +784,8 @@ export const GetData = async (req, res) => {
           value: activet_data,
           LimitData: limitData,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         });
         previousCount = count;
       }
@@ -601,7 +793,6 @@ export const GetData = async (req, res) => {
     // last 12 hr data
     else if (data_stage === "12hr") {
       // console.log("yes")
-    
       const currentTimeMinusTwelveHr = new Date(
         currentDateTime.getTime() - 12 * 60 * 60 * 1000
       );
@@ -675,6 +866,11 @@ export const GetData = async (req, res) => {
           result[sensor] = processSensorData(sensorData);
           return result;
         }, {});
+      
+
+
+
+
 
         const response = {
           Sensor1: sensor1Data,
@@ -687,6 +883,8 @@ export const GetData = async (req, res) => {
           LimitData: limitData,
           value: activet_data,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         };
 
         res.status(200).json(response);
@@ -697,6 +895,8 @@ export const GetData = async (req, res) => {
           value: activet_data,
           LimitData: limitData,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         });
         previousCount = count;
       }
@@ -794,6 +994,8 @@ export const GetData = async (req, res) => {
           LimitData: limitData,
           value: activet_data,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         };
 
         res.status(200).json(response);
@@ -804,6 +1006,8 @@ export const GetData = async (req, res) => {
           value: activet_data,
           LimitData: limitData,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         });
         previousCount = count;
       }
@@ -897,6 +1101,8 @@ export const GetData = async (req, res) => {
           LimitData: limitData,
           value: activet_data,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         };
 
         res.status(200).json(response);
@@ -907,6 +1113,7 @@ export const GetData = async (req, res) => {
           value: activet_data,
           LimitData: limitData,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
         });
         previousCount = count;
       }
@@ -1001,6 +1208,8 @@ export const GetData = async (req, res) => {
           LimitData: limitData,
           value: activet_data,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         };
 
         res.status(200).json(response);
@@ -1011,6 +1220,8 @@ export const GetData = async (req, res) => {
           value: activet_data,
           LimitData: limitData,
           terminal_status: count > previousCount,
+          Delta:Deltavalues
+
         });
         previousCount = count;
       }
@@ -1830,9 +2041,6 @@ const yesterday5PM = moment().subtract(1, "day").set({ hour: 17, minute: 0, seco
 // Send email with PDF attachment
 const sendEmail = async () => {
   const pdfBuffer = await generatePDF();
-
- 
-
   const mailOptions = {
     from: "stephen@xyma.in",
     to: "antonystephen060696@gmail.com",
@@ -1860,9 +2068,70 @@ export const AutoReport = async (req, res) => {
   }
 };
 
+export const TestData = async(req, res)=>{
+  try {
+    console.log("Running intervalofhour() every hour..=======.");
+    const currentDateTime = new Date();
+    const currentTimeMinusOneHr = new Date(
+      currentDateTime.getTime() - 1 * 60 * 60 * 1000
+    );
+    const kolkataTime2 = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false, // 24-hour format
+    }).format(currentDateTime);
+
+
+    const [date2, time2] = kolkataTime2.split(", ");
+    const [month2, day2, year2] = date2.split("/");
+    let [hours2, minutes2, seconds2] = time2.split(":");
+
+    if (hours2 === "24") {
+      hours2 = "00";
+    }
+  
+    hours2 = hours2.padStart(2, "0");
+    minutes2 = minutes2.padStart(2, "0");
+    seconds2 = seconds2.padStart(2, "0");
+  
+    const formattedCurrentTimeMinusOneHr = `${year2}-${month2.padStart(
+      2,
+      "0"
+    )}-${day2.padStart(2, "0")},${hours2}:${minutes2}:${seconds2}`;
+
+
+  
+
+    
+    const a = formattedCurrentTimeMinusOneHr.split(",")
+    const b = a[1].split(":");
+    const c = b[0]-1;
+    const onehourbeforedata = a[0]+","+c+":"+b[1]+":"+b[2]
+
+
+    // console.log("fromdatesss=",onehourbeforedata)
+    // console.log("todate=",formattedCurrentTimeMinusOneHr)
+
+    await intervalofhour(onehourbeforedata,formattedCurrentTimeMinusOneHr);
+  } catch (error) {
+    console.error("Error in hourly task:", error);
+  }
+}
+
+
 // Schedule report at 17:00 (5:00 PM) daily
-cron.schedule("0 17 * * *", () => {
-  console.log("Generating and sending daily report...");
-  sendEmail();
+
+cron.schedule("0 17 * * *",async () => {
+  try {
+    console.log("Generating and sending daily report...");
+    await sendEmail();
+  } catch (error) {
+    console.error("Error sending daily report:", error);
+  }
 });
 
