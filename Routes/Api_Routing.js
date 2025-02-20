@@ -9,7 +9,7 @@ import {
   InsetLimit,
   getRilReport,
   getRilAverageReport,
-  AutoReport,TestData,
+  AutoReport,TestData,MailAlert
 } from "../api_v1/api.js";
 
 const router = express.Router();
@@ -22,7 +22,8 @@ router.get("/DataCollection", GetData);
 router.post("/InserLimit", InsetLimit);
 router.get("/getRilReport", getRilReport);
 router.get("/getRilAverageReport", getRilAverageReport);
-router.get("/autoreport",AutoReport)
-router.get("/tesing",TestData)
+router.get("/autoreport",AutoReport);
+router.post("/mailAlret",MailAlert);
+router.get("/tesing",TestData);
 
 export default router;
