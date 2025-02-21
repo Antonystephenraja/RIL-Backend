@@ -141,82 +141,82 @@ export const Insert = async (req, res) => {
 
     await newData.save();
 
-    const findemaillimit = await EmailAlert.findOne({});
-    if (!findemaillimit) {
-      return res.status(404).json({ message: "Email alert limits not found" });
-    }
+    // const findemaillimit = await EmailAlert.findOne({});
+    // if (!findemaillimit) {
+    //   return res.status(404).json({ message: "Email alert limits not found" });
+    // }
 
-    let exceededSensors = [];
+    // let exceededSensors = [];
 
-    // Check if sensors exceed the limit
-    if (Sensor1 > parseInt(findemaillimit.Sensor1)) {
-      exceededSensors.push({ name: "Sensor1", value: Sensor1 });
-    }
-    if (Sensor2 > parseInt(findemaillimit.Sensor2)) {
-      exceededSensors.push({ name: "Sensor2", value: Sensor2 });
-    }
-    if (Sensor3 > parseInt(findemaillimit.Sensor3)) {
-      exceededSensors.push({ name: "Sensor3", value: Sensor3 });
-    }
+    // // Check if sensors exceed the limit
+    // if (Sensor1 > parseInt(findemaillimit.Sensor1)) {
+    //   exceededSensors.push({ name: "Sensor1", value: Sensor1 });
+    // }
+    // if (Sensor2 > parseInt(findemaillimit.Sensor2)) {
+    //   exceededSensors.push({ name: "Sensor2", value: Sensor2 });
+    // }
+    // if (Sensor3 > parseInt(findemaillimit.Sensor3)) {
+    //   exceededSensors.push({ name: "Sensor3", value: Sensor3 });
+    // }
 
-    if (exceededSensors.length === 0) {
-      return res.status(200).json({ message: "No sensors exceeded limits" });
-    }
+    // if (exceededSensors.length === 0) {
+    //   return res.status(200).json({ message: "No sensors exceeded limits" });
+    // }
 
-    const currentTime = moment();
+    // const currentTime = moment();
     
-    // Get the last alert timestamp for each sensor
-    const lastAlerts = await AlertSystem.find({
-      sensor: { $in: exceededSensors.map((sensor) => sensor.name) },
-    });
+    // // Get the last alert timestamp for each sensor
+    // const lastAlerts = await AlertSystem.find({
+    //   sensor: { $in: exceededSensors.map((sensor) => sensor.name) },
+    // });
 
-    exceededSensors = exceededSensors.filter((sensor) => {
-      const lastAlert = lastAlerts.find((alert) => alert.sensor === sensor.name);
-      if (!lastAlert) return true; 
+    // exceededSensors = exceededSensors.filter((sensor) => {
+    //   const lastAlert = lastAlerts.find((alert) => alert.sensor === sensor.name);
+    //   if (!lastAlert) return true; 
 
-      const lastAlertTime = moment(lastAlert.lastSent);
-      return currentTime.diff(lastAlertTime, "minutes") >= 10;
-    });
+    //   const lastAlertTime = moment(lastAlert.lastSent);
+    //   return currentTime.diff(lastAlertTime, "minutes") >= 10;
+    // });
 
-    if (exceededSensors.length === 0) {
-      return res.status(200).json({ message: "Alerts already sent recently" });
-    }
+    // if (exceededSensors.length === 0) {
+    //   return res.status(200).json({ message: "Alerts already sent recently" });
+    // }
 
-    const allUsers = await loginModel.find({}, "UserName");
-    const userMailIds = allUsers.map((user) => user.UserName).join(",");
-    const emailContent = exceededSensors
-      .map(
-        (sensor) =>
-          `Sensor: ${sensor.name}\nRecorded Temperature: ${sensor.value}°C`
-      )
-      .join("\n\n");
-    const mailOptions = {
-      from: "alert@xyma.in",
-      // to: userMailIds,
-      to: "stephen@xyma.in",
-      subject: "⚠️ Alert: Sensors Exceeded Safe Levels",
-      text: `Alert: Sensors exceeded safe levels.\n\n${emailContent}\n\nTube Number: 39\nAsset Location: ROGC Furnace, 4th Pass.`,
-    };
+    // const allUsers = await loginModel.find({}, "UserName");
+    // const userMailIds = allUsers.map((user) => user.UserName).join(",");
+    // const emailContent = exceededSensors
+    //   .map(
+    //     (sensor) =>
+    //       `Sensor: ${sensor.name}\nRecorded Temperature: ${sensor.value}°C`
+    //   )
+    //   .join("\n\n");
+    // const mailOptions = {
+    //   from: "alert@xyma.in",
+    //   // to: userMailIds,
+    //   to: "stephen@xyma.in",
+    //   subject: "⚠️ Alert: Sensors Exceeded Safe Levels",
+    //   text: `Alert: Sensors exceeded safe levels.\n\n${emailContent}\n\nTube Number: 39\nAsset Location: ROGC Furnace, 4th Pass.`,
+    // };
 
-    // Send email
-    transporter.sendMail(mailOptions, async (error, info) => {
-      if (error) {
-        console.error("Error sending email:", error);
-      } else {
-        console.log("Alert email sent:", info.response);
+    // // Send email
+    // transporter.sendMail(mailOptions, async (error, info) => {
+    //   if (error) {
+    //     console.error("Error sending email:", error);
+    //   } else {
+    //     console.log("Alert email sent:", info.response);
 
-        // Update last sent alert time for each triggered sensor
-        await Promise.all(
-          exceededSensors.map((sensor) =>
-            AlertSystem.updateOne(
-              { sensor: sensor.name },
-              { lastSent: currentTime },
-              { upsert: true }
-            )
-          )
-        );
-      }
-    });
+    //     // Update last sent alert time for each triggered sensor
+    //     await Promise.all(
+    //       exceededSensors.map((sensor) =>
+    //         AlertSystem.updateOne(
+    //           { sensor: sensor.name },
+    //           { lastSent: currentTime },
+    //           { upsert: true }
+    //         )
+    //       )
+    //     );
+    //   }
+    // });
     return res
       .status(200)
       .json({ message: "Data inserted successfully", data: newData });
