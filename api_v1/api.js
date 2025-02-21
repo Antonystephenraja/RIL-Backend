@@ -2065,7 +2065,9 @@ const sendEmail = async () => {
   
   const mailOptions = {
     from: "alert@xyma.in",
-    to: userMailIds ? userMailIds : "stephen@xyma.in",
+    // to: userMailIds ? userMailIds : "stephen@xyma.in",
+    to: "stephen@xyma.in",
+
     subject: "Daily Sensor Report - Summary & Insights",
     text: `Dear User,
 
