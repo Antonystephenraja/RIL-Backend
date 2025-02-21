@@ -140,86 +140,85 @@ export const Insert = async (req, res) => {
     });
 
     await newData.save();
+    res.status(200).json({ message: "Data inserted successfully", data: newData });
+    try {
+      const findemaillimit = await EmailAlert.findOne({});
+      if (!findemaillimit) {
+        console.error("Email alert limits not found");
+        return;
+      }
+      let exceededSensors = [];
+      if (Sensor1 > parseInt(findemaillimit.Sensor1)) {
+        exceededSensors.push({ name: "Sensor1", value: Sensor1 });
+      }
+      if (Sensor2 > parseInt(findemaillimit.Sensor2)) {
+        exceededSensors.push({ name: "Sensor2", value: Sensor2 });
+      }
+      if (Sensor3 > parseInt(findemaillimit.Sensor3)) {
+        exceededSensors.push({ name: "Sensor3", value: Sensor3 });
+      }
+      if (exceededSensors.length === 0) {
+        console.log("No sensors exceeded limits");
+        return;
+      }
+      const currentTime = moment();
+      const lastAlerts = await AlertSystem.find({ sensor: { $in: exceededSensors.map(s => s.name) } });
+      exceededSensors = exceededSensors.filter(sensor => {
+        const lastAlert = lastAlerts.find(alert => alert.sensor === sensor.name);
+        if (!lastAlert) return true;
 
-    // const findemaillimit = await EmailAlert.findOne({});
-    // if (!findemaillimit) {
-    //   return res.status(404).json({ message: "Email alert limits not found" });
-    // }
+        const lastAlertTime = moment(lastAlert.lastSent);
+        return currentTime.diff(lastAlertTime, "minutes") >= 10;
+      });
+      if (exceededSensors.length === 0) {
+        console.log("Alerts already sent recently");
+        return;
+      }
+      const allUsers = await loginModel.find({}, "UserName");
+      const userMailIds = allUsers.map(user => user.UserName).join(",");
+      const emailContent = exceededSensors
+        .map(sensor => `Sensor: ${sensor.name}\nRecorded Temperature: ${sensor.value}°C`)
+        .join("\n\n");
+      
+        const mailOptions = {
+          from: "alert@xyma.in",
+          to: userMailIds ? userMailIds : "stephen@xyma.in",
+          subject: "⚠️ Alert: Sensors Exceeded Safe Limits",
+          text: `Dear Team,\n\nAlert: Sensors exceeded safe levels.\n\n${emailContent}\n\nTube Number: 39\nAsset Location: ROGC Furnace, 4th Pass\n\n\n.
+        Best Regards,  
+        **XYMA Analytics Team**  
+        📧 alert@xyma.in  
+        📞 +91 9360565362  
+        `,
+        };
+        
+      transporter.sendMail(mailOptions, async (error, info) => {
+        if (error) {
+          console.error("Error sending email:", error);
+        } else {
+          console.log("Alert email sent:", info.response);
 
-    // let exceededSensors = [];
+          try {
+            // Update database with last sent time for each sensor
+            await Promise.all(
+              exceededSensors.map(sensor =>
+                AlertSystem.updateOne(
+                  { sensor: sensor.name },
+                  { lastSent: currentTime},  // Ensure it's a valid timestamp
+                  { upsert: true }
+                )
+              )
+            );
+            console.log("Sensor alert timestamps updated successfully.");
+          } catch (dbError) {
+            console.error("Error updating alert timestamps:", dbError.message || dbError);
+          }
+        }
+      });
 
-    // // Check if sensors exceed the limit
-    // if (Sensor1 > parseInt(findemaillimit.Sensor1)) {
-    //   exceededSensors.push({ name: "Sensor1", value: Sensor1 });
-    // }
-    // if (Sensor2 > parseInt(findemaillimit.Sensor2)) {
-    //   exceededSensors.push({ name: "Sensor2", value: Sensor2 });
-    // }
-    // if (Sensor3 > parseInt(findemaillimit.Sensor3)) {
-    //   exceededSensors.push({ name: "Sensor3", value: Sensor3 });
-    // }
-
-    // if (exceededSensors.length === 0) {
-    //   return res.status(200).json({ message: "No sensors exceeded limits" });
-    // }
-
-    // const currentTime = moment();
-    
-    // // Get the last alert timestamp for each sensor
-    // const lastAlerts = await AlertSystem.find({
-    //   sensor: { $in: exceededSensors.map((sensor) => sensor.name) },
-    // });
-
-    // exceededSensors = exceededSensors.filter((sensor) => {
-    //   const lastAlert = lastAlerts.find((alert) => alert.sensor === sensor.name);
-    //   if (!lastAlert) return true; 
-
-    //   const lastAlertTime = moment(lastAlert.lastSent);
-    //   return currentTime.diff(lastAlertTime, "minutes") >= 10;
-    // });
-
-    // if (exceededSensors.length === 0) {
-    //   return res.status(200).json({ message: "Alerts already sent recently" });
-    // }
-
-    // const allUsers = await loginModel.find({}, "UserName");
-    // const userMailIds = allUsers.map((user) => user.UserName).join(",");
-    // const emailContent = exceededSensors
-    //   .map(
-    //     (sensor) =>
-    //       `Sensor: ${sensor.name}\nRecorded Temperature: ${sensor.value}°C`
-    //   )
-    //   .join("\n\n");
-    // const mailOptions = {
-    //   from: "alert@xyma.in",
-    //   // to: userMailIds,
-    //   to: "stephen@xyma.in",
-    //   subject: "⚠️ Alert: Sensors Exceeded Safe Levels",
-    //   text: `Alert: Sensors exceeded safe levels.\n\n${emailContent}\n\nTube Number: 39\nAsset Location: ROGC Furnace, 4th Pass.`,
-    // };
-
-    // // Send email
-    // transporter.sendMail(mailOptions, async (error, info) => {
-    //   if (error) {
-    //     console.error("Error sending email:", error);
-    //   } else {
-    //     console.log("Alert email sent:", info.response);
-
-    //     // Update last sent alert time for each triggered sensor
-    //     await Promise.all(
-    //       exceededSensors.map((sensor) =>
-    //         AlertSystem.updateOne(
-    //           { sensor: sensor.name },
-    //           { lastSent: currentTime },
-    //           { upsert: true }
-    //         )
-    //       )
-    //     );
-    //   }
-    // });
-    return res
-      .status(200)
-      .json({ message: "Data inserted successfully", data: newData });
+    } catch (emailError) {
+      console.error("Error processing email alerts:", emailError);
+    }
       
   } catch (error) {
     return res
@@ -1933,10 +1932,9 @@ const hour_interval =async()=>{
 }
 
 const generatePDF = async () => {
-
   return new Promise(async (resolve, reject) => {
     const today5PM = moment().set({ hour: 17, minute: 0, second: 0 }).format("YYYY-MM-DD,HH:mm:ss");
-const yesterday5PM = moment().subtract(1, "day").set({ hour: 17, minute: 0, second: 0 }).format("YYYY-MM-DD,HH:mm:ss");
+    const yesterday5PM = moment().subtract(1, "day").set({ hour: 17, minute: 0, second: 0 }).format("YYYY-MM-DD,HH:mm:ss");
 
     const doc = new PDFDocument({ margin: 50 });
     const bufferStream = new streamBuffers.WritableStreamBuffer();
@@ -2064,11 +2062,20 @@ const sendEmail = async () => {
   const allUsers = await loginModel.find({}, "UserName");
   const userMailIds = allUsers.map((user) => user.UserName).join(",");
   const pdfBuffer = await generatePDF();
+  
   const mailOptions = {
     from: "alert@xyma.in",
-    to: "antonystephen060696@gmail.com",
-    subject: "Daily Sensor Report",
-    text: "Attached is the daily sensor report.",
+    to: userMailIds ? userMailIds : "stephen@xyma.in",
+    subject: "Daily Sensor Report - Summary & Insights",
+    text: `Dear User,
+
+
+Please find attached the latest daily sensor report, which includes real-time sensor data, performance metrics, and key insights. This report provides a summary of temperature readings and any anomalies detected in the system.
+
+If you have any questions or require further analysis, feel free to reach out.
+
+Best Regards,  
+XYMA Analytics Team`,
     attachments: [{ filename: "daily_report.pdf", content: pdfBuffer }],
   };
 
@@ -2076,10 +2083,11 @@ const sendEmail = async () => {
     if (error) {
       console.error("Error sending email: ", error);
     } else {
-      console.log("Email sent: ", info.response);
+      console.log("Email sent successfully: ", info.response);
     }
   });
 };
+
 
 // API route to trigger report manually
 export const AutoReport = async (req, res) => {
@@ -2132,12 +2140,13 @@ export const TestData = async(req, res)=>{
     const onehourbeforedata = a[0]+","+c+":"+b[1]+":"+b[2]
 
 
-    // console.log("fromdatesss=",onehourbeforedata)
-    // console.log("todate=",formattedCurrentTimeMinusOneHr)
-
+    console.log("fromdatesss=",onehourbeforedata)
+    console.log("todate=",formattedCurrentTimeMinusOneHr)
+    
     await intervalofhour(onehourbeforedata,formattedCurrentTimeMinusOneHr);
   } catch (error) {
     console.error("Error in hourly task:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 }
 
