@@ -1946,6 +1946,7 @@ const generatePDF = async () => {
     const logoPath = path.join(__dirname, "../Assets/xyma_blue.png");
     const coverPath = path.join(__dirname, "../Assets/pdfcover.png");
     const disclaimer = path.join(__dirname, "../Assets/disclaimerPage.jpg");
+    const pipemodel = path.join(__dirname, "../Assets/rill.jpg");
 
     if (fs.existsSync(coverPath)) {
       doc.image(coverPath, 0, 0, { width: 620, height: 800 });
@@ -1970,23 +1971,68 @@ const generatePDF = async () => {
     { align: "justify" }
   );
   doc.moveDown(2);
+ // Define positions
+    const imageX = 50; // Left margin for the image
+    const textStartX = 300; // Right side text alignment
+    const tableStartX = 300; // Table starts further right
+    const rowheight = 20;
+    const columnWidths = [40, 80, 160]; // Widths for S.No, Sensor, Limit Range
 
-  // **Asset Information**
-  doc.font("Helvetica-Bold").fontSize(12).fillColor("#000").text("Sensor Id:", { continued: true })
-    .font("Helvetica").text(" XY001", { underline: false });
+    const sectionStartY = doc.y; // Keep track of starting Y position
+    if (fs.existsSync(pipemodel)) {
+      doc.image(pipemodel, imageX, sectionStartY, { width: 200, height: 300 });
+    }
 
-  doc.font("Helvetica-Bold").text("Plant:", { continued: true })
-    .font("Helvetica").text(" RIL C2,Jamnagar", { underline: false });
+    // **Right-Side Sensor Information**
+    const textGap = 20; // Spacing between text lines
 
-  doc.font("Helvetica-Bold").text("Coil No:", { continued: true })
-    .font("Helvetica").text("39", { underline: false });
+    doc.font("Helvetica-Bold").fontSize(12).fillColor("#000").text("Sensor Id:", textStartX, sectionStartY)
+      .font("Helvetica").text(" XY001", textStartX + 80, sectionStartY);
 
-  doc.font("Helvetica-Bold").text("Asset:", { continued: true })
-    .font("Helvetica").text(" ROGC Furnace", { underline: false });
+    doc.font("Helvetica-Bold").text("Plant:", textStartX, sectionStartY + textGap)
+      .font("Helvetica").text(" RIL C2, Jamnagar", textStartX + 80, sectionStartY + textGap);
 
-    doc.font("Helvetica-Bold").text("Sensor Location:", { continued: true })
-    .font("Helvetica").text(" 4th Pass,last 5 meter", { underline: false });
-    doc.moveDown(2);
+    doc.font("Helvetica-Bold").text("Tube No:", textStartX, sectionStartY + 2 * textGap)
+      .font("Helvetica").text("39", textStartX + 81, sectionStartY + 2 * textGap);
+
+    doc.font("Helvetica-Bold").text("Asset:", textStartX, sectionStartY + 3 * textGap)
+      .font("Helvetica").text("ROGC Furnace", textStartX + 80, sectionStartY + 3 * textGap);
+
+    doc.font("Helvetica-Bold").text("Sensor Location:", textStartX, sectionStartY + 4 * textGap)
+      .font("Helvetica").text("4th Pass, last 5 meter", textStartX + 110, sectionStartY + 4 * textGap);
+
+    //limit tables
+    const tableYStart = sectionStartY + 6 * textGap;
+    const headerHeight = rowheight;
+
+    doc.font("Helvetica")
+      .text("S.No", tableStartX, tableYStart, { width: columnWidths[0], align: "center" })
+      .text("Sensor", tableStartX + columnWidths[0], tableYStart, { width: columnWidths[1], align: "center" })
+      .text("Limit Range(Degree Celsius)", tableStartX + columnWidths[0] + columnWidths[1], tableYStart, { width: columnWidths[2], align: "center" });
+
+    doc.rect(tableStartX, tableYStart - 5, columnWidths[0] + columnWidths[1] + columnWidths[2], headerHeight).stroke();
+    const findemaillimit = await EmailAlert.findOne({});
+    const sensorData = [
+      { sNo: "1", sensor: "Sensor 1", limit: `${findemaillimit?.Sensor1 ?? "N/A"}` },
+      { sNo: "2", sensor: "Sensor 2", limit: `${findemaillimit?.Sensor2 ?? "N/A"}` },
+      { sNo: "3", sensor: "Sensor 3", limit: `${findemaillimit?.Sensor3 ?? "N/A"}` }
+    ];
+
+    sensorData.forEach((item, index) => {
+      let rowY = tableYStart + (index + 1) * rowheight;
+
+      // 📝 Fill Table Data
+      doc.font("Helvetica")
+        .text(item.sNo, tableStartX, rowY, { width: columnWidths[0], align: "center" })
+        .text(item.sensor, tableStartX + columnWidths[0], rowY, { width: columnWidths[1], align: "center" })
+        .text(item.limit, tableStartX + columnWidths[0] + columnWidths[1], rowY, { width: columnWidths[2], align: "center" });
+
+      // 🔲 Draw Borders for Each Row
+      doc.rect(tableStartX, rowY - 5, columnWidths[0] + columnWidths[1] + columnWidths[2], rowheight).stroke();
+    });
+
+      
+    doc.addPage(); // Move to third page
     const chartImage = await generateChart();
     doc.image(chartImage, 50, doc.y, { width: 500, height: 250 });
     doc.moveDown(20); 
