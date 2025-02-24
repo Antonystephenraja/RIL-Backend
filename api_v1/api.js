@@ -2033,6 +2033,7 @@ const generatePDF = async () => {
 
       
     doc.addPage(); // Move to third page
+    doc.moveDown(5);
     const chartImage = await generateChart();
     doc.image(chartImage, 50, doc.y, { width: 500, height: 250 });
     doc.moveDown(20); 
