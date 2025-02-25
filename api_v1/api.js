@@ -2235,6 +2235,17 @@ export const MailAlert = async (req, res) => {
 };
 
 
+
+export const Alldata = async (req, res) => {
+  try {
+    const response = await InsertModel.find(); // Fetch all documents from the collection
+    res.status(200).json(response); // Send response back to client
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
 // Schedule report at 17:00 (5:00 PM) daily
 cron.schedule("0 17 * * *",async () => {
   try {
